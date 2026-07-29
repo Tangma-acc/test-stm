@@ -58,7 +58,7 @@ def process_bay_with_gemini(file_bytes, password):
 
 def process_ktb_scan_with_gemini(file_bytes, mime_type):
     """ฟังก์ชันจัดการไฟล์ KTB (Scan/Picture) ด้วย AI - ปรับปรุงความแม่นยำช่องฝาก/ถอน"""
-    model_name = "gemini-1.5-flash" 
+    model_name = "gemini-2.5-flash" 
     
     prompt = """
     คุณคือ OCR ผู้เชี่ยวชาญด้านบัญชีชั้นสูง โปรดอ่านสเตทเมนท์ธนาคารกรุงไทย (KTB) จากไฟล์นี้อย่างละเอียด
