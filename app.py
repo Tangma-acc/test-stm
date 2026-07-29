@@ -17,8 +17,8 @@ import unicodedata
 st.set_page_config(page_title="PDF Statement Converter", layout="wide")
 
 # ================= 0. AI Configuration =================
-GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-client = genai.Client(api_key=GEMINI_API_KEY)
+GEMINI_API_KEY_V1 = st.secrets["GEMINI_API_KEY_V1"]
+client = genai.Client(api_key=GEMINI_API_KEY_V1)
 
 def process_bay_with_gemini(file_bytes, password):
     """ฟังก์ชันจัดการไฟล์ BAY ด้วย Gemini AI"""
@@ -319,7 +319,7 @@ def parse_ktb_pdf(pdf_stream):
 
 # ===== 4.BBL =====
 def process_bbl_with_gemini(file_bytes, password):
-    client = genai.Client(api_key=GEMINI_API_KEY)
+    client = genai.Client(api_key=GEMINI_API_KEY_V1)
     unlocked_bytes = file_bytes
     try:
         with pikepdf.open(io.BytesIO(file_bytes), password=password) as pdf:
