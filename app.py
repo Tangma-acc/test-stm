@@ -169,72 +169,82 @@ def parse_uob_pdf(pdf_stream):
 # ===== 1.KBank =====
 def parse_kbank_pdf(pdf_stream):
     all_parsed_rows = []
-    bf_keywords = ["ยอดยกมา", "Balance Brought Forward", "Brought Forward"]
-    table_headers = ["เวลา/", "วันที่มีผล", "ถอนเงิน / ฝากเงิน", "ยอดคงเหลือ", "ทำรายการ (บาท)"]
+    is_company_format = False # Flag เพื่อเช็คว่าเป็นแบบบริษัทหรือไม่
+    
     with pdfplumber.open(pdf_stream) as pdf_obj:
+        # เช็คหน้าแรกก่อนเพื่อดูว่าเป็น Format ไหน
+        first_page_text = pdf_obj.pages[0].extract_text() or ""
+        if "รายละเอียด" in first_page_text and "ช่องทาง" in first_page_text:
+            is_company_format = True
+        
         for page in pdf_obj.pages:
             text = page.extract_text()
             if not text: continue
             lines = text.split('\n')
-            is_in_table = False 
+            
             for line in lines:
                 line = line.strip()
-                if not line: continue
+                # ตรวจจับบรรทัดที่มีวันที่ (DD-MM-YY)
                 date_match = re.match(r'^(\d{2}-\d{2}-\d{2})', line)
                 if date_match:
-                    is_in_table = True 
                     date = date_match.group(1)
                     time_match = re.search(r'(\d{2}:\d{2})', line)
                     time = time_match.group(1) if time_match else ""
+                    
+                    # ค้นหาตัวเลขจำนวนเงิน (หาตัวเลขที่มี .XX สองชุด คือ จำนวนเงิน และ ยอดคงเหลือ)
                     amounts = re.findall(r'-?[\d,]+\.\d{2}', line)
+                    
+                    # แยกคำอธิบายรายการ (อยู่ระหว่าง เวลา กับ จำนวนเงินตัวแรก)
                     temp_text = line.replace(date, "", 1).strip()
                     if time: temp_text = temp_text.replace(time, "", 1).strip()
-                    desc = temp_text.split(amounts[0])[0].strip() if amounts else temp_text
-                    amount_val, balance = None, None
-                    if len(amounts) == 1:
-                        balance = str_to_float(amounts[0])
-                    elif len(amounts) >= 2:
-                        is_deposit = any(kw in desc for kw in ["รับเงิน", "คืนเงิน", "ฝาก", "เงินคืน", "Thai QR", "รับโอนเงิน", "รับโอน", "รับเงินจาก"])
+                    
+                    desc = ""
+                    if amounts:
+                        desc = temp_text.split(amounts[0])[0].strip()
+                    
+                    amount_val = None
+                    balance = None
+                    
+                    if len(amounts) >= 1:
+                        # เช็คว่าเป็นเงินเข้าหรือออก (จากคำอธิบาย)
                         val = str_to_float(amounts[0])
-                        amount_val = val if is_deposit else -val
+                        income_keywords = ["รับโอน", "ฝาก", "คืนเงิน", "Thai QR", "รับเงิน", "Interest"]
+                        is_income = any(kw in desc for kw in income_keywords)
+                        amount_val = val if is_income else -val
                         balance = str_to_float(amounts[-1])
+
+                    # ส่วนที่เหลือหลังจากยอดคงเหลือ (คือ ช่องทาง + ข้อมูลต่อท้าย)
                     remaining = ""
                     if amounts:
                         parts = line.split(amounts[-1])
-                        if len(parts) > 1: remaining = parts[-1].strip()
-                    chan, det = split_channel_and_detail(remaining)
-                    all_parsed_rows.append([date, time, desc, amount_val, balance, chan, det])
-                    continue 
-                if any(kw in line for kw in table_headers):
-                    is_in_table = True
-                    continue
-                if any(kw in line for kw in ["Total", "รวมทั้งสิ้น", "จบรายการ"]):
-                    is_in_table = False
-                    continue
-                if is_in_table:
-                    if any(x in line for x in ["หน้า", "แผ่นที่", "ยอดคงเหลือ", "รวมถอนเงิน", "รวมฝากเงิน"]): 
-                        continue
-                    c_extra, d_extra = split_channel_and_detail(line)
-                    all_parsed_rows.append(["", "", "", None, None, c_extra if c_extra != "-" else "", d_extra])
-    rows_to_delete = set()
-    n = len(all_parsed_rows)
-    bf_indices = [idx for idx, row in enumerate(all_parsed_rows) if any(kw in str(row[2]) for kw in bf_keywords)]
-    if bf_indices:
-        keep_idx = None
-        for idx in bf_indices:
-            if all_parsed_rows[idx][0]: keep_idx = idx; break
-        if keep_idx is None: keep_idx = bf_indices[0]
-        for idx in bf_indices:
-            if idx != keep_idx: rows_to_delete.add(idx)
-    i = 0
-    while i < n:
-        if all_parsed_rows[i][0] == "" and all_parsed_rows[i][3] is None:
-            start_block = i
-            while i < n and all_parsed_rows[i][0] == "" and all_parsed_rows[i][3] is None: i += 1
-            if (i - start_block) > 3:
-                for k in range(start_block, i): rows_to_delete.add(k)
-        else: i += 1
-    return [row for idx, row in enumerate(all_parsed_rows) if idx not in rows_to_delete]
+                        if len(parts) > 1:
+                            remaining = parts[-1].strip()
+                    
+                    # แยกช่องทาง
+                    chan, rest = split_channel_and_detail(remaining)
+                    
+                    if is_company_format:
+                        # แบบนิติบุคคล: [วันที่, เวลา, รายการ, เงิน, คงเหลือ, ช่องทาง, รายละเอียด]
+                        all_parsed_rows.append([date, time, desc, amount_val, balance, chan, rest])
+                    else:
+                        # แบบบุคคล: [วันที่, เวลา, รายการ, เงิน, คงเหลือ, ช่องทาง, รหัสสาขา, ผู้ทำรายการ]
+                        # ปกติแบบบุคคล rest จะมี รหัสสาขา(4หลัก) และ รหัสผู้ทำ
+                        branch_match = re.search(r'(\d{4})\s+(.*)', rest)
+                        if branch_match:
+                            branch_code = branch_match.group(1)
+                            user_code = branch_match.group(2)
+                        else:
+                            branch_code = "-"
+                            user_code = rest
+                        all_parsed_rows.append([date, time, desc, amount_val, balance, chan, branch_code, user_code])
+
+    # กำหนดหัวตารางตามประเภทที่ตรวจพบ
+    if is_company_format:
+        cols = ["วันที่", "เวลา", "รายการ", "ถอนเงิน / ฝากเงิน", "ยอดคงเหลือ(บาท)", "ช่องทาง", "รายละเอียด"]
+    else:
+        cols = ["วันที่", "เวลา", "รายการ", "ถอนเงิน / ฝากเงิน", "ยอดคงเหลือ(บาท)", "ช่องทาง", "รหัส สาขา", "ผู้ทำรายการ"]
+        
+    return all_parsed_rows, cols
 
 # ===== 2.SCB =====
 def parse_scb_pdf(pdf_stream):
@@ -411,8 +421,8 @@ if convert_button:
                         except: pass
                     
                     if bank_option == "กสิกรไทย (KBank)":
-                        rows = parse_kbank_pdf(unlocked_io)
-                        df = pd.DataFrame(rows, columns=["วันที่", "เวลา", "รายการ", "ถอนเงิน/ฝากเงิน", "ยอดคงเหลือ", "ช่องทาง", "รายละเอียด"])
+                        rows, cols = parse_kbank_pdf(unlocked_io)
+                        df = pd.DataFrame(rows, columns=cols)
                     elif bank_option == "ไทยพาณิชย์ (SCB)":
                         rows = parse_scb_pdf(unlocked_io)
                         df = pd.DataFrame(rows, columns=["วันที่", "เวลา", "รายการ", "ช่องทาง", "ถอนเงิน/ฝากเงิน", "ยอดคงเหลือ", "รายละเอียด"])
