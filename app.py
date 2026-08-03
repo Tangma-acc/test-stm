@@ -465,7 +465,6 @@ if convert_button:
                     if bank_option == "กสิกรไทย (KBank)":
                             rows = parse_kbank_pdf(unlocked_io)
                             df = pd.DataFrame(rows, columns=["วันที่", "เวลา", "รายการ", "ถอนเงิน/ฝากเงิน", "ยอดคงเหลือ", "ช่องทาง", "รายละเอียด"])
-                            df['วันที่'] = pd.to_datetime(df['วันที่'], format='%d-%m-%y', errors='coerce')
                     elif bank_option == "ไทยพาณิชย์ (SCB)":
                         rows = parse_scb_pdf(unlocked_io)
                         df = pd.DataFrame(rows, columns=["วันที่", "เวลา", "รายการ", "ช่องทาง", "ถอนเงิน/ฝากเงิน", "ยอดคงเหลือ", "รายละเอียด"])
