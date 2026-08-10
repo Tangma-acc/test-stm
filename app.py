@@ -316,7 +316,7 @@ def parse_scb_pdf(pdf_stream):
         "กรุณาติดต่อศูนย์บริการลูกค้าธุรกิจ", "02-722-2222", "Contact Center",
         "computer-generated", "authorized person", "signature of SCB",
         "หน้าที่", "Page", "เอกสารฉบับนี้", "จัดพิมพ์ผ่านระบบคอมพิวเตอร์",
-        "Balance Carried Forward", "ยอดเงินคงเหลือยกไป", "ธนาคารไทยพาณิชย์", "จำกัด", "(มหาชน)", "จำนวนเงินนำเข้าบัญชีทั้งหมด", 
+        "Balance Carried Forward", "ยอดเงินคงเหลือยกไป", "ธนาคารไทยพาณิชย์", "(มหาชน)", "จำนวนเงินนำเข้าบัญชีทั้งหมด", 
         "Total Credit Amount", "จำนวนเงินที่หักบัญชีทั้งหมด", "Total Debit Amount",         
         "Date", "Time", "Code", "Channel", "Cheque No.", "Withdrawal", "Deposit", "Description",
         "Debit/Credit", "Balance/Baht", "วันที่", "เวลา", "รายการ", "ช่องทาง", "ยอดเงินคงเหลือ",
